@@ -53,3 +53,19 @@ def handle_message(event):
 
 if __name__ == "__main__":
     app.run()
+
+
+@app.route("/callback", methods=['POST'])
+def callback():
+    signature = request.headers['X-Line-Signature']
+    body = request.get_data(as_text=True)
+    print("Received body:", body)  # เพิ่มบรรทัดนี้
+
+    try:
+        handler.handle(body, signature)
+        print("Handled successfully")  # เพิ่มบรรทัดนี้
+    except InvalidSignatureError:
+        print("Invalid signature")  # เพิ่มบรรทัดนี้
+        abort(400)
+
+    return 'OK'
