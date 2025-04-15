@@ -6,7 +6,7 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import openai
 import os
 
-app = Flask(name)
+app = Flask(__name__)
 
 ดึงค่าจาก environment variables ที่ตั้งไว้บน Render
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('2007269330')
