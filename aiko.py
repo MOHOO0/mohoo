@@ -54,22 +54,3 @@ def handle_message(event):
 if __name__ == "__main__":
     app.run()
 
-
-
-try:
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "คุณคือ Aiko สาวญี่ปุ่น ขยัน ฉลาด รอบรู้ พูดจานุ่มนวล"},
-            {"role": "user", "content": user_text}
-        ]
-    )
-    reply_text = response['choices'][0]['message']['content']
-except Exception as e:
-    print("Error with OpenAI:", e)
-    reply_text = "ขอโทษค่ะ Aiko มีปัญหาในการตอบตอนนี้"
-
-line_bot_api.reply_message(
-    event.reply_token,
-    TextSendMessage(text=reply_text)
-)
