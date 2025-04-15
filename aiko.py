@@ -7,14 +7,18 @@ import os
 
 app = Flask(name)
 
-ตั้งค่า Token จาก LINE
-LINE_CHANNEL_ACCESS_TOKEN = 'YOUR_LINE_CHANNEL_ACCESS_TOKEN'
-LINE_CHANNEL_SECRET = 'YOUR_LINE_CHANNEL_SECRET'
+ดึงค่าจาก environment variables ที่ตั้งไว้บน Render
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
+openai.api_key = OPENAI_API_KEY
 
-ตั้งค่า OpenAI
-openai.api_key = "YOUR_OPENAI_API_KEY"
+@app.route("/", methods=['GET'])
+def home():
+    return "Aiko is running!"
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -25,23 +29,26 @@ def callback():
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
+
     return 'OK'
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_message = event.message.text
-    # ส่งข้อความไปยัง GPT เพื่อให้ Aiko ตอบ
+    user_text = event.message.text
+
+    # สั่งให้ GPT ตอบในฐานะ Aiko
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # หรือ gpt-4
+        model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "คุณคือ Aiko สาวญี่ปุ่นขยันและรอบรู้"},
-            {"role": "user", "content": user_message}
+            {"role": "system", "content": "คุณคือ Aiko สาวญี่ปุ่น ขยัน ฉลาด รอบรู้ พูดจานุ่มนวล"},
+            {"role": "user", "content": user_text}
         ]
     )
-    reply = response.choices[0].message['content']
+
+    reply_text = response['choices'][0]['message']['content']
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text=reply)
+        TextSendMessage(text=reply_text)
     )
 
 if name == "main":
