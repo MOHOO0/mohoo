@@ -8,7 +8,7 @@ import os
 
 app = Flask(__name__)
 
-ดึงค่าจาก Environment Variables ที่ตั้งไว้บน Render
+# ดึงค่าจาก Environment Variables ที่ตั้งไว้บน Render
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -52,6 +52,6 @@ def handle_message(event):
         TextSendMessage(text=reply_text)
     )
 
-if name == "__main__":
+if __name__ == "__main__":
     app.run()
 
