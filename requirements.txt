@@ -2,4 +2,3 @@ flask
 gunicorn
 line-bot-sdk
 openai
-callback
