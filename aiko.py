@@ -1,4 +1,3 @@
-
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -54,4 +53,3 @@ def handle_message(event):
 
 if __name__ == "__main__":
     app.run()
-
