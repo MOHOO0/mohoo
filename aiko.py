@@ -4,6 +4,8 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import requests
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 
