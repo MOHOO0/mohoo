@@ -1,35 +1,41 @@
 import sqlite3
-import os
+from datetime import datetime, timedelta
 
-DB_PATH = 'memory.db'
+DB_FILE = 'memory.db'
 
 def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS memory (
-                user_id TEXT,
-                role TEXT,
-                message TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS memory (
+            user_id TEXT,
+            timestamp DATETIME,
+            role TEXT,
+            content TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-def save_message(user_id, role, message):
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute('INSERT INTO memory (user_id, role, message) VALUES (?, ?, ?)', (user_id, role, message))
-        conn.commit()
+def save_message(user_id, role, content):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO memory (user_id, timestamp, role, content)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, datetime.utcnow(), role, content))
+    conn.commit()
+    conn.close()
 
-def get_history(user_id, limit=10):
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute('''
-            SELECT role, message FROM memory
-            WHERE user_id = ?
-            ORDER BY timestamp DESC
-            LIMIT ?
-        ''', (user_id, limit))
-        rows = c.fetchall()
-        return [{'role': row[0], 'content': row[1]} for row in reversed(rows)]
+def load_recent_memory(user_id, minutes=10):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    since = datetime.utcnow() - timedelta(minutes=minutes)
+    c.execute('''
+        SELECT role, content FROM memory
+        WHERE user_id = ? AND timestamp >= ?
+        ORDER BY timestamp ASC
+    ''', (user_id, since))
+    rows = c.fetchall()
+    conn.close()
+    return [{'role': row[0], 'content': row[1]} for row in rows]
