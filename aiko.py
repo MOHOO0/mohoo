@@ -7,15 +7,17 @@ import os
 
 app = Flask(__name__)
 
-# 🛡️ ใส่ TOKEN ที่คุณได้จาก LINE Developer
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "YOUR_LINE_ACCESS_TOKEN")
-LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "YOUR_LINE_SECRET")
-
-# 🔐 ใส่ API KEY จาก OpenRouter (https://openrouter.ai)
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "your-openrouter-key")
+# ดึงค่าจาก Environment Variables
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
+
+@app.route("/", methods=['GET'])
+def home():
+    return "Aiko is online with LLaMA 3!"
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -31,41 +33,35 @@ def callback():
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_input = event.message.text
+    user_text = event.message.text
 
-    # 📦 เตรียม request สำหรับ OpenRouter (Command R+)
+    # สร้าง prompt ให้ AI
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://yourdomain.com",  # เปลี่ยนให้ตรงกับโดเมนของคุณ
+        "HTTP-Referer": "https://yourdomain.com",  # แนะนำใส่ domain จริง หรือ localhost ก็ได้ตอนทดสอบ
         "X-Title": "Aiko Bot"
     }
 
     data = {
-        "model": "cohere/command-r-plus",
-        "max_tokens": 1024,  # ปรับให้ไม่เกินโควต้า
+        "model": "meta-llama/llama-3-8b-instruct",
         "messages": [
-            {"role": "system", "content": "คุณคือ Aiko สาวญี่ปุ่นผู้ฉลาด สุภาพ และใจเย็น"},
-            {"role": "user", "content": user_input}
+            {"role": "system", "content": "คุณคือ Aiko สาวญี่ปุ่น ขยัน ฉลาด รอบรู้ พูดจานุ่มนวล"},
+            {"role": "user", "content": user_text}
         ]
     }
 
-    try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
-        response_data = response.json()
+    response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
 
-        if "choices" in response_data:
-            ai_reply = response_data["choices"][0]["message"]["content"]
-        else:
-            ai_reply = "❌ เกิดข้อผิดพลาดจากฝั่ง AI: " + response_data.get("error", {}).get("message", "ไม่ทราบสาเหตุ")
+    if response.status_code == 200:
+        result = response.json()
+        reply = result['choices'][0]['message']['content']
+    else:
+        reply = "ขอโทษค่ะ ตอนนี้ Aiko มีปัญหาในการเชื่อมต่อกับสมองใหญ่"
 
-    except Exception as e:
-        ai_reply = f"⚠️ เกิดข้อผิดพลาด: {str(e)}"
-
-    # 📤 ส่งกลับไปยัง LINE
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text=ai_reply)
+        TextSendMessage(text=reply)
     )
 
 if __name__ == "__main__":
