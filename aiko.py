@@ -1,69 +1,71 @@
-import os
-import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
-from memory import init_db, save_message, get_history
+import requests
+import os
 
-# === CONFIG ===
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+app = Flask(__name__)
+
+# ตั้งค่าจาก Environment Variables หรือใส่ตรงนี้ก็ได้
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "YOUR_LINE_CHANNEL_ACCESS_TOKEN")
+LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "YOUR_LINE_CHANNEL_SECRET")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "your_openrouter_api_key")
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# === FLASK APP ===
-app = Flask(__name__)
-init_db()
+# ฟังก์ชันเรียก OpenRouter + LLaMA 3
 
-@app.route("/callback", methods=['POST'])
+def ask_openrouter(prompt):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": "meta-llama/llama-3-8b-instruct",
+        "messages": [
+            {"role": "system", "content": "คุณคือผู้ช่วย AI ที่พูดภาษาไทยได้อย่างเป็นธรรมชาติ ตอบอย่างสุภาพ ชัดเจน และตรงประเด็น"},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=25)
+        response.raise_for_status()
+        result = response.json()
+        return result['choices'][0]['message']['content']
+
+    except requests.exceptions.Timeout:
+        return "⏳ ระบบตอบช้า กรุณาลองใหม่อีกครั้งนะคะ"
+
+    except requests.exceptions.RequestException as e:
+        return f"❌ เกิดข้อผิดพลาดกับระบบ AI: {str(e)}"
+
+# Webhook หลักจาก LINE
+@app.route("/callback", methods=["POST"])
 def callback():
-    signature = request.headers['X-Line-Signature']
+    signature = request.headers["X-Line-Signature"]
     body = request.get_data(as_text=True)
 
     try:
         handler.handle(body, signature)
-    except InvalidSignatureError:
+    except Exception as e:
+        print(f"[ERROR] Webhook error: {e}")
         abort(400)
 
-    return 'OK'
+    return "OK"
 
+# เมื่อมีข้อความเข้ามา
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_id = event.source.user_id
-    user_message = event.message.text
+    user_text = event.message.text
+    reply_text = ask_openrouter(user_text)
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
 
-    save_message(user_id, 'user', user_message)
-    history = get_history(user_id, limit=10)
-
-    try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "meta-llama/llama-3-8b-instruct",
-                "messages": history + [{"role": "user", "content": user_message}]
-            },
-            timeout=20
-        )
-        response.raise_for_status()
-
-        ai_reply = response.json()['choices'][0]['message']['content']
-    except Exception as e:
-        ai_reply = "ขอโทษค่ะ ตอนนี้ระบบมีปัญหาชั่วคราว ลองใหม่อีกครั้งได้นะคะ"
-        print("Error from OpenRouter:", e)
-
-    save_message(user_id, 'assistant', ai_reply)
-
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=ai_reply)
-    )
-
+# รันแอป (ถ้า run ในเครื่อง local)
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True, port=5000)
