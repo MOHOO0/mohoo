@@ -41,24 +41,27 @@ def handle_message(event):
     }
 
     data = {
-        "model": "cohere/command-r-plus",
+        "model": "cohere/command-r-plus",  # ตรวจสอบชื่ออีกครั้งว่าเขียนถูก
         "messages": [
             {"role": "system", "content": "คุณคือ Aiko สาวญี่ปุ่นผู้ฉลาด สุภาพ และใจเย็น"},
             {"role": "user", "content": user_input}
         ]
     }
 
-    response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
+    try:
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
+        response_data = response.json()
 
-    if response.status_code == 200:
-        ai_reply = response.json()["choices"][0]["message"]["content"]
-    else:
-        ai_reply = "ขออภัย ตอนนี้ Aiko ไม่สามารถตอบได้ค่ะ 😢"
+        if response.status_code == 200 and "choices" in response_data:
+            ai_reply = response_data["choices"][0]["message"]["content"]
+        else:
+            print("❌ ERROR from OpenRouter:", response_data)
+            ai_reply = "ขอโทษค่ะ Aiko มีปัญหากับโมเดล AI ตอนนี้ ลองใหม่อีกครั้งนะคะ 🙇‍♀️"
+    except Exception as e:
+        print("❌ Exception:", e)
+        ai_reply = "เกิดข้อผิดพลาดบางอย่างค่ะ ลองใหม่อีกทีนะคะ 🥺"
 
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=ai_reply)
     )
-
-if __name__ == "__main__":
-    app.run()
